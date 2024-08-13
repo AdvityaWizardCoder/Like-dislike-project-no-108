@@ -1,0 +1,62 @@
+import cv2
+import mediapipe as mp
+
+cap = cv2.VideoCapture(0)
+mp_hands = mp.solutions.hands
+mp_drawing = mp.solutions.drawing_utils
+hands = mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5)
+
+# Define the fingertip landmarks
+fingertips = [4, 8, 12, 16, 20]
+
+while True:
+    success, image = cap.read()
+    image = cv2.flip(image, 1)
+    height, width, _ = image.shape
+
+    # Convert the image from BGR to RGB
+    rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    results = hands.process(rgb_image)
+    hand_landmarks = results.multi_hand_landmarks
+    
+    if hand_landmarks:
+        for hand_landmark in hand_landmarks:
+            # Create an empty list to store the status of finger folds
+            finger_fold_status = []
+            
+            for tip_id in fingertips:
+                x, y = int(hand_landmark.landmark[tip_id].x * width), int(hand_landmark.landmark[tip_id].y * height)
+                cv2.circle(image, (x, y), 10, (255, 0, 0), cv2.FILLED)
+                
+               
+                if tip_id != 4:
+                    if hand_landmark.landmark[tip_id].x < hand_landmark.landmark[tip_id - 2].x:
+                        cv2.circle(image, (x, y), 10, (0, 255, 0), cv2.FILLED)
+                        finger_fold_status.append(True)
+                    else:
+                        finger_fold_status.append(False)
+
+            
+            if all(finger_fold_status): 
+                thumb_tip_y = hand_landmark.landmark[4].y
+                thumb_base_y = hand_landmark.landmark[3].y
+                
+                if thumb_tip_y < thumb_base_y:  # Thumb up
+                    cv2.putText(image, "LIKE", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                    print("LIKE")
+                else:  # Thumb down
+                    cv2.putText(image, "DISLIKE", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                    print("DISLIKE")
+                    
+            
+            mp_drawing.draw_landmarks(image, hand_landmark, mp_hands.HAND_CONNECTIONS)
+
+    cv2.imshow("Hand Gesture Detection", image)
+
+    key = cv2.waitKey(1)
+    if key == 32:
+        break
+
+cap.release()
+cv2.destroyAllWindows()
